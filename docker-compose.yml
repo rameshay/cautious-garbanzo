@@ -1,0 +1,61 @@
+version: "3"
+services:
+    mgw-monitor-syslog:
+        image: helder/rsyslog
+        volumes:
+            - /tmp/syslog:/var
+    mgw-monitor-redis:
+        image: redis
+        command: redis-server --appendonly yes
+        volumes:
+            - /tmp/redis:/var
+            - /tmp/redis-data:/data
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-syslog:syslog
+    mgw-monitor-websvr:
+        build: ./mgw-monitor-websvr
+        image: mgw-monitor-web:latest
+        command: python app.py
+        ports:
+        - "443:443"
+        volumes:
+        - .:/files
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-syslog:syslog
+            - mgw-monitor-redis
+            - mgw-monitor-redis:db
+    mgw-monitor-cfg:
+        build: mgw-monitor-cfg
+        image: mgw-monitor-cfg:latest
+        command: /root/docker-entry-point.sh
+        volumes:
+            - /tmp/db-config:/var
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-syslog:syslog
+            - mgw-monitor-redis
+            - mgw-monitor-redis:db
+        environment:
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-1:
+        build: mgw-monitor
+        image: mgw-monitor:latest
+        #restart: on_failure
+        privileged: true
+        command: /root/docker-entry-point.sh
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-syslog:syslog
+            - mgw-monitor-redis
+            - mgw-monitor-redis:db
+        volumes:
+            - /tmp/mgw-monitor-1:/var
+            - /home/ramesh.ayyagari/cautious-garbanzo/mgw-monitor:/code
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-034d61437ed2a4899
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+
