@@ -1,7 +1,14 @@
 #!/bin/bash
 
 # Start the first process
-/usr/sbin/racoon -f /etc/racoon/racoon.conf -l /var/log/racoon.log
+if [ ! -d /var/log ]; then
+    mkdir /var/log
+fi
+if [ ! -d /var/run ] ; then
+    mkdir /var/run
+fi
+
+/usr/sbin/racoon -f /etc/racoon/racoon.conf  | logger -d -n mgw-monitor-syslog -s &
 
 status=$?
 if [ $status -ne 0  ]; then
@@ -10,7 +17,7 @@ if [ $status -ne 0  ]; then
 fi
 
 # Start the second process
-/root/gw-monitor.py &
+/usr/bin/env python /root/gw-monitor.py | logger -d -n mgw-monitor-syslog -s &
 status=$?
 if [ $status -ne 0  ]; then
     echo "Failed to start monitor script: $status"
@@ -21,13 +28,12 @@ fi
 # This illustrates part of the heavy lifting you need to do if you want to run
 # more than one service in a container. The container will exit with an error
 # if it detects that either of the processes has exited.
-while /bin/true; do
-    PROCESS_1_STATUS=$(ps aux |grep -q racoon)
-    PROCESS_2_STATUS=$(ps aux |grep -q monitor)
-    if [ $PROCESS_1_STATUS || $PROCESS_2_STATUS  ]; then
-        echo "One of the processes has already exited."
-        exit -1
-    fi
+while [ true ] ; do
+#    P1=$(ps aux |grep -q racoon)
+#    P2=$(ps aux |grep -q monitor)
+#    if [ -z "$P1" ] || [ -z "$P2" ]; then
+#        echo "One of the processes has already exited."
+#        exit 1
+#    fi
     sleep 60
 done
-
