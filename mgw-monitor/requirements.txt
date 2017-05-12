@@ -1,0 +1,4 @@
+redis
+requests
+certifi
+urllib3[secure]
