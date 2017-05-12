@@ -1,31 +1,32 @@
 {
     "common": {
-        "roles" : ["prd-syd", "prd-sjc", "eoe", "dev","perf"],
-        "assigned" : "eoe"
+        "assigned" : "eoe",
+        "monitor_vars" : {
+           "curl_connect_timeout" : 10,
+           "curl_max_time" : 5,
+           "consec_fail_threshold" : 3,
+           "proxy" : "172.20.254.254:3128",
+           "duty_cycle_in_minutes" : 30,
+           "url_white_list" : [
+               "https://github.com",
+               "https://apps.groupdocs.com",
+               "https://exportwriter.zoho.com",
+               "https://en.4sync.com",
+               "https://www.surveymonkey.com",
+               "https://slack.com",
+               "https://mail.aol.com",
+               "https://mail.yahoo.com",
+               "https://portal.azure.com",
+               "https://docs.google.com",
+               "https://mail.live.com"
+           ]
+        }
     },
     "eoe": {
          "redis_host" : "local-redis",
          "redis_port" : 6917,
          "redis_cfg_db_index" : 0,
          "redis_status_db_index" : 1,
-         "monitor_vars" : {
-            "curl_connect_timeout" : 10,
-            "curl_max_time" : 5,
-            "consec_fail_threshold" : 3,
-            "proxy" : "172.20.254.254:3128",
-            "duty_cycle_in_minutes" : 30,
-            "url_white_list" : ["https://github.com",
-                "https://apps.groupdocs.com",
-                "https://exportwriter.zoho.com",
-                "https://en.4sync.com",
-                "https://www.surveymonkey.com",
-                "https://slack.com",
-                "https://mail.aol.com",
-                "https://mail.yahoo.com",
-                "https://portal.azure.com",
-                "https://docs.google.com",
-                "https://mail.live.com"]
-         },
          "mgw_to_monitor" : {
             "eoe-pdx-mobile-gateway-05da89105f4fdcf46" : "52.36.200.172",
             "eoe-pdx-mobile-gateway-034d61437ed2a4899" : "52.32.213.74",
@@ -40,5 +41,6 @@
             "eoe-pdx-mobile-gateway-0f7f086f87916ed23" : "34.208.27.8",
             "eoe-pdx-mobile-gateway-0f2a4874845a6f952" : "52.25.51.24"
          }
-    }
+    },
+    "dummy" : "end_of_file"
 }

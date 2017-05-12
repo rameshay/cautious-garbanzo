@@ -17,12 +17,13 @@ if [ $status -ne 0  ]; then
 fi
 
 # Start the second process
-/usr/bin/env python /root/gw-monitor.py | logger -d -n mgw-monitor-syslog -s &
-status=$?
-if [ $status -ne 0  ]; then
-    echo "Failed to start monitor script: $status"
-    exit $status
-fi
+# Keep it in foreground. So that when this exists we restart the container
+#/usr/bin/env python /code/files/gw-monitor.py | logger -d -n mgw-monitor-syslog -s 
+#status=$?
+#if [ $status -ne 0  ]; then
+#    echo "Failed to start monitor script: $status"
+#    exit $status
+#fi
 
 # Naive check runs checks once a minute to see if either of the processes exited.
 # This illustrates part of the heavy lifting you need to do if you want to run

@@ -35,7 +35,7 @@ DFLT_GW=${DFLT_RT%;*}
 # bring down phase1
 phase1_down() {
   # restore previous resolv.conf
-  [ -f /etc/resolv.conf.prevpn ] && mv /etc/resolv.conf.prevpn /etc/resolv.conf
+  [ -f /etc/resolv.conf.prevpn ] && mv /etc/resolv.conf.prevpn /etc/resolv.conf ]
 
   if [ -n "${SPLIT_INCLUDE_CIDR}" ]; then
     # split tunnel: remove specific tunnel routes

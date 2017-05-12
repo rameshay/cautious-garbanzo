@@ -1,5 +1,6 @@
 import os
 import sys
+import socket
 import subprocess
 import time
 from datetime import datetime
@@ -52,7 +53,7 @@ class monitorDb:
             logger.critical("Redis Connect to KeepAlives Db failed Excepton = " + str(ex))
 
     def get_all_gw_instance(self):
-        gw_instances = [None]
+        gw_instances = []
         if (self._rh_cfg):
             gw_instances = self._rh_cfg.get('eoe*')
         return gw_instances
@@ -80,7 +81,6 @@ class monitorDb:
                         'named': 'MobileGateway Named Service Down',
                         'elastica': 'MobileGateway Elastica Service Down'}
         tStamp = datetime.utcnow()
-        logger.info(" Time now is %s" % tStamp)
         if (self._rh_status):
             key = 'consec_errors:' + str(self._instance)
             if (len(self._rh_status.hgetall(key)) == 0):
@@ -105,7 +105,6 @@ class monitorDb:
             if (len(statusDict) == 0):
                 self._rh_status.hset(key, 'status_code', 200)
                 self._rh_status.hset(key, 'status_string', 'Success')
-            logger.info("Status Dict = %s " % statusDict.items())
             if (flag is False):
                 self._rh_status.hset(key, 'status_code', 200)
                 self._rh_status.hset(key, 'status_string', 'Success')
@@ -181,25 +180,47 @@ class gwOperations():
                              str('dig_out') + " : Exception" + str(exc))
                 time.sleep(5)
 
+    def check_named_socket(self):
+        while (True):
+            try:
+                box_com = socket.gethostbyname('www.box.com')
+                if(box_com.find("172.20.") < 0):
+                    time.sleep(1)
+                    continue
+                else:
+                    logger.info(" named successful: " + str(box_com))
+                    self._db_handle.set_gw_status(
+                        'named', True, self._consec_threshold)
+                    break
+            except Exception as exc:
+                self._db_handle.set_gw_status(
+                    'named', False, self._consec_threshold)
+                logger.error("Exception taken for unable to verify synthetic ip for box.com, out = " +
+                             str('box_com') + " : Exception" + str(exc))
+                time.sleep(5)
+
 class curlOperations():
     def __init__(self, proxy, timeout, maxtime):
-        self._proxy = proxy
+        self._proxy = str(proxy)
         self._timeout = timeout
         self._maxtime = maxtime
 
     def check_gw(self, url):
+        logger.info(" Requesting url = %s", url)
         headers = {'user-agent': 'gw-monitor/0.0.1'}
-        r = requests.head(str(url), proxies=str(self._proxy),headers=headers, verify=False, timeout=(self._timeout, self._maxtime))
-        logger.info("Request for url %s returned code %d", str(url), r.status_code)
-        if (r.status_code == requests.codes.ok):
-            viaHeader = r.headers['Via']
-            if (viaHeader.find('Elastica Gateway Service')):
-                return (True)
+        proxies = {'https': self._proxy}
+        r = requests.head(str(url), proxies=proxies,headers=headers, verify=False, timeout=(self._timeout, self._maxtime))
+        if ((r.status_code == requests.codes.ok) or
+            (r.status_code == requests.codes.found)):
+            if(r.headers['Via'].find('Elastica Gateway Service') < 0):
+                logger.critical("missing via header response = %s", r.headers)
+                return(False)
             else:
-                logger.critical("Request for url %s returned code %d, missing via header ", str(url), r.status_code)
-                return (False)
+                return(True)
         else:
-            return (False)
+            logger.error("Request for url %s returned code %d time taken %d",
+                         r.url, r.status_code , r.elapsed.total_seconds())
+            return False
 
 
 def start_monitoring(gw_to_monitor):
@@ -207,13 +228,18 @@ def start_monitoring(gw_to_monitor):
     try:
         db = monitorDb(gw_to_monitor)
     except Exception as exc:
-        logger.error('Unable to connect to Redis, exception = ' + str(exc))
+        logger.critical('Unable to connect to Redis, exception = ' + str(exc))
         sys.exit(-1)
     _proxy = db.get_monitor_var('proxy')
-    _curl_connect_timeout = db.get_monitor_var('curl_connect_timeout')
-    _curl_max_time = db.get_monitor_var('curl_max_time')
+    _curl_connect_timeout = float(db.get_monitor_var('curl_connect_timeout'))
+    _curl_max_time = float(db.get_monitor_var('curl_max_time'))
     _consec_failure_total_cnt = db.get_monitor_var('consec_fail_threshold')
     _url_whitelist = db.get_monitor_var('url_white_list')
+    _url_whitelist = _url_whitelist.replace("[", "")
+    _url_whitelist = _url_whitelist.replace("]", "")
+    _url_whitelist = _url_whitelist.replace("u'", "")
+    _url_whitelist = _url_whitelist.replace("'", "")
+    _url_whitelist = _url_whitelist.split(',')
     _duty_cycle_time = db.get_monitor_var('duty_cycle_in_minutes')
 
     logger.info("Final configs: CURL_CONNECT_TIMEOUT: %s, "
@@ -233,32 +259,34 @@ def start_monitoring(gw_to_monitor):
     logger.info("Gateway Connection = " +
                 str((1000 * (time.time() - start))) + " Milliseconds")
     while True:
-        gwOps.check_named()
+        gwOps.check_named_socket()
         logger.info("Named Connection + Gateway Connection = " +
                     str((1000 * (time.time() - start))) + " Milliseconds")
         curl_start = time.time()
+        rcodes = []
         for url in _url_whitelist:
-            rcode = curlOps.check_gw(url)
-            curl_end = time.time()
+            rcode = curlOps.check_gw(str(url))
             logger.info("Curl Operation for url %s returned rcode %d",str(url), rcode)
-            logger.info("It took " + str(1000 * (curl_end - curl_start)) + " Milliseconds" + " for url " + str(url) + " to complete")
-            curl_start = curl_end
-
-        if (rcode is not 200):
-            db.set_gw_status('curl', False, _consec_failure_total_cnt)
-        else:
-            db.set_gw_status('curl', True, _consec_failure_total_cnt)
+            rcodes.append(rcode)
+        curl_end = time.time()
+        status =  reduce(lambda x, y: x | y, rcodes)
+        db.set_gw_status('curl', status, _consec_failure_total_cnt)
+        logger.info("Status = %s It took %s Milliseconds for curl to complete, curl-rcodes = %s" , str(status),  str(1000 * (curl_end - curl_start)), str(rcodes))
 
         time.sleep(10)
-        time_left = (60 * _duty_cycle_time) - (time.time() - start)
+        time_left = (60 * float(_duty_cycle_time)) - (time.time() - start)
         if (time_left < 0):
-           gwOperations.check_charon('disconnect')
-           time.sleep(5)
-           time_left = (60 * _duty_cycle_time)
-           db.set_gw_monitor_keepalive()
-           start = time.time()
-           gwOps.check_charon('connect')
-           logger.info("Gateway Connection = " + str((1000 * (time.time() - start))) + " Milliseconds")
+            logger.info("Disconnecting from Gateway and Reconnecting")
+            gwOps.check_charon('disconnect')
+            time.sleep(5)
+            time_left = (60 * _duty_cycle_time)
+            db.set_gw_monitor_keepalive()
+            start = time.time()
+            gwOps.check_charon('connect')
+            logger.info("Gateway Connection = " + str((1000 * (time.time() - start))) + " Milliseconds")
+        else:
+            logger.info("Back to Curl time_left = %s", str(time_left))
+            continue
 
 
 if __name__ == "__main__":
@@ -277,5 +305,5 @@ if __name__ == "__main__":
         logger.critical('Exiting cannot proceed without instance name')
         sys.exit(-1)
     else:
-        logger.info('Proceeding with gateway instance = ' + str(gw_to_monitor))
+        logger.info('STARTING with gateway instance = ' + str(gw_to_monitor))
     start_monitoring(gw_to_monitor)
