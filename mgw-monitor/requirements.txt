@@ -1,4 +1,5 @@
 redis
 requests
+pyping
 certifi
 urllib3[secure]

@@ -1,6 +1,7 @@
 import os
 import sys
 import socket
+import pyping
 import subprocess
 import time
 from datetime import datetime
@@ -255,11 +256,15 @@ def start_monitoring(gw_to_monitor):
 
     start = time.time()
     db.set_gw_monitor_keepalive()
+    r = pyping.ping('172.20.254.254')
+    if r.ret_code == 0:
+        logger.info('Already connected to mgw disconnecting first before connect')
+        gwOps.check_charon('disconnect')
     gwOps.check_charon('connect')
     logger.info("Gateway Connection = " +
                 str((1000 * (time.time() - start))) + " Milliseconds")
     while True:
-        gwOps.check_named_socket()
+        gwOps.check_named()
         logger.info("Named Connection + Gateway Connection = " +
                     str((1000 * (time.time() - start))) + " Milliseconds")
         curl_start = time.time()
@@ -270,7 +275,7 @@ def start_monitoring(gw_to_monitor):
             rcodes.append(rcode)
         curl_end = time.time()
         status =  reduce(lambda x, y: x | y, rcodes)
-        db.set_gw_status('curl', status, _consec_failure_total_cnt)
+        db.set_gw_status('elastica', status, _consec_failure_total_cnt)
         logger.info("Status = %s It took %s Milliseconds for curl to complete, curl-rcodes = %s" , str(status),  str(1000 * (curl_end - curl_start)), str(rcodes))
 
         time.sleep(10)

@@ -26,18 +26,18 @@ services:
         links: 
             - mgw-monitor-syslog
             - mgw-monitor-redis
-    mgw-monitor-cfg:
-        build: mgw-monitor-cfg
-        image: mgw-monitor-cfg:latest
-        command: /root/docker-entry-point.sh
-        volumes:
-            - /var/log/elastica/mgw-monitor-cfg:/var
-        links: 
-            - mgw-monitor-syslog
-            - mgw-monitor-redis
-        environment:
-            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
-            - DB_PORT_6379_TCP_PORT=6379
+#    mgw-monitor-cfg:
+#        build: mgw-monitor-cfg
+#        image: mgw-monitor-cfg:latest
+#        command: /root/docker-entry-point.sh
+#        volumes:
+#            - /var/log/elastica/mgw-monitor-cfg:/var
+#        links: 
+#            - mgw-monitor-syslog
+#            - mgw-monitor-redis
+#        environment:
+#            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+#            - DB_PORT_6379_TCP_PORT=6379
     mgw-monitor-1:
         build: mgw-monitor
         image: mgw-monitor:latest
@@ -51,6 +51,81 @@ services:
             - /var/log/elastica/mgw-monitor-1:/var
             - /home/ramesh.ayyagari/:/var/dev
         environment:
-            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0f2a4874845a6f952
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0ab03cf50d432f18a
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-2:
+        build: mgw-monitor
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-2:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-05da89105f4fdcf46
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-3:
+        build: mgw-monitor
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-3:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0fceaa9c17213e29e
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-4:
+        build: mgw-monitor
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-4:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-06303d0889b8b8326
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-5:
+        build: mgw-monitor
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-5:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0475e93504bbd561d
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-6:
+        build: mgw-monitor
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-6:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0690f08a69b32b3a0
             - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
             - DB_PORT_6379_TCP_PORT=6379
