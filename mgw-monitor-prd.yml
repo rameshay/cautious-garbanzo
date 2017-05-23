@@ -1,0 +1,87 @@
+version: "3"
+services:
+    mgw-monitor-1:
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-1:/var
+            - /home/ramesh.ayyagari/:/var/dev
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0ab03cf50d432f18a
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-2:
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-2:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-05da89105f4fdcf46
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-3:
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-3:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0fceaa9c17213e29e
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-4:
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-4:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-06303d0889b8b8326
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-5:
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-5:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0475e93504bbd561d
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+    mgw-monitor-6:
+        image: mgw-monitor:latest
+        command: bash ./files/docker-entry-point.sh
+#        restart: on-failure
+        privileged: true
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        volumes:
+            - /var/log/elastica/mgw-monitor-6:/var
+        environment:
+            - MGW_INSTANCE_NAME=eoe-pdx-mobile-gateway-0690f08a69b32b3a0
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379

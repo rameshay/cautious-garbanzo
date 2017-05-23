@@ -24,19 +24,19 @@ get(keepalives)  {instance-ids} with a 30 second expiry
 '''
 
 def string_to_bool(inputString):
-    out = []
-    string = inputString.replace(" ","")
-    string = string.split(',')
-    for val in string:
+    out = [False]*len(inputString)
+    ii = 0
+    for val in inputString:
         if val == 'True':
-            out.append(True)
-        elif val == 'False':
-            out.append(False)
+            out[ii] = True
+        ii += 1
     return out
 
 class monitorDb:
     def __init__(self, instance=None):
         self._instance = instance
+        self._status_flag_dict = {}
+        self._time_stamps_dict = {}
         try:
             self._rh_cfg = Redis(host=os.environ['DB_PORT_6379_TCP_ADDR'], port=os.environ[
                                  'DB_PORT_6379_TCP_PORT'], db=0)
@@ -52,6 +52,22 @@ class monitorDb:
                                         'DB_PORT_6379_TCP_PORT'], db=2)
         except Exception as ex:
             logger.critical("Redis Connect to KeepAlives Db failed Excepton = " + str(ex))
+
+    def init_status_flags_ts(self,consec_fail_cnt):
+        logger.info("Initializing DB consec_error = %d", int(consec_fail_cnt))
+        ii = 0
+        key = 'consec_errors:'+str(self._instance)
+        while (ii < int(consec_fail_cnt)):
+            self._status_flag_dict['flags_'+str(ii)] = False
+            self._time_stamps_dict['ts_'+str(ii)] = str(datetime.utcnow())
+            ii += 1
+
+        if(len(self._rh_status.hmget(key, self._status_flag_dict.keys())) < consec_fail_cnt):
+            logger.info("Initializing status_flag dict")
+            self._rh_status.hmset('consec_errors:',self._status_flag_dict)
+        if(len(self._rh_status.hmget(key, self._time_stamps_dict.keys())) < consec_fail_cnt):
+            logger.info("Initializing timestamp dict")
+            self._rh_status.hmset('consec_errors:',self._time_stamps_dict)
 
     def get_all_gw_instance(self):
         gw_instances = []
@@ -71,63 +87,49 @@ class monitorDb:
             gw_ip = self._rh_cfg.get(self._instance)
         return gw_ip
 
-    def get_gw_status(self):
+    def get_gw_status(self, val):
         gw_status = None
         if (self._rh_status):
-            gw_status = self._rh_status.hget(self._instance)
+            key = 'status:'+str(self._instance)
+            gw_status = self._rh_status.hget(key, val)
         return gw_status
 
-    def set_gw_status(self, module, state, consec_error_threshold):
+
+    def set_gw_web_status(self, module, flag):
         errorStrings = {'charon': 'MobileGateway VPN service down',
                         'named': 'MobileGateway Named Service Down',
                         'elastica': 'MobileGateway Elastica Service Down'}
-        tStamp = datetime.utcnow()
-        if (self._rh_status):
-            key = 'consec_errors:' + str(self._instance)
-            if (len(self._rh_status.hgetall(key)) == 0):
-                consecErrorDictDefault = {}
-                consecErrorDictDefault['index'] = 0
-                consecErrorDictDefault['flags'] = 'False, False, False'
-                consecErrorDictDefault['ts_0'] = str(tStamp)
-                consecErrorDictDefault['ts_1'] = str(tStamp)
-                consecErrorDictDefault['ts_2'] = str(tStamp)
-                logger.info("Creating defaultDict = %s" % consecErrorDictDefault.items())
-                self._rh_status.hmset(key, consecErrorDictDefault)
-
-            status_index = int(self._rh_status.hget(key,'index'))
-            self._rh_status.hincrby(key, 'index', 1)
-            status_index %= int(consec_error_threshold)
-            flags = string_to_bool(self._rh_status.hget(key,'flags'))
-            if (len(flags) > status_index):
-                flags[status_index] = state
-            flag = reduce(lambda x, y: x | y, flags)
-            key = 'status:' + str(self._instance)
-            statusDict = self._rh_status.hgetall(key)
-            if (len(statusDict) == 0):
-                self._rh_status.hset(key, 'status_code', 200)
-                self._rh_status.hset(key, 'status_string', 'Success')
-            if (flag is False):
-                self._rh_status.hset(key, 'status_code', 200)
-                self._rh_status.hset(key, 'status_string', 'Success')
-            else:
-                self._rh_status.hset(key, 'status_code', 500)
-                self._rh_status.hset(key, 'status_string', errorStrings[str(module)])
-            self._rh_status.hset(key, 'flags', str(flags))
-            ts_key = 'ts_' + str(status_index)
-            self._rh_status.hset(key, ts_key, str(tStamp))
-            logger.info("Setting consecErrorDict to %s " % self._rh_status.hgetall(key).items())
+        webstatus_key = 'web_status:' + str(self._instance)
+        statusDict = self._rh_status.hgetall(webstatus_key)
+        if (len(statusDict) == 0):
+            self._rh_status.hset(webstatus_key, 'status_code', 500)
+            self._rh_status.hset(webstatus_key, 'status_string', 'Initialization incomplete')
+        if (flag is True):
+            self._rh_status.hset(webstatus_key, 'status_code', 200)
+            self._rh_status.hset(webstatus_key, 'status_string', 'Success')
         else:
-            logger.critical("Redis DB handle for status missing")
+            self._rh_status.hset(webstatus_key, 'status_code', 500)
+            self._rh_status.hset(webstatus_key, 'status_string', errorStrings[str(module)])
+        logger.info("Setting web_status module %s to %s",str(module), str(flag))
 
+    def set_consec_error_status(self, module, state, consec_error_threshold):
+        flags_array = [False]*int(consec_error_threshold)
+        consec_key = 'consec_errors:'+str(self._instance)
+        consec_index = int(self._rh_status.hget(consec_key,'index'))
+        self._rh_status.hincrby(consec_key, 'index', 1)
+        consec_index %= int(consec_error_threshold)
+        flags_array = string_to_bool(self._rh_status.hmget(consec_key,self._status_flag_dict.keys()))
+        flags_array[consec_index] = state
+        flag = reduce(lambda x, y: x | y, flags_array)
+        self.set_gw_web_status(module, flag)
 
-    def set_gw_errors(self, module, *args):
-        ts = time.gmtime()
-        if (self.rh_status):
-            key = 'errors:' + str(self._instance)
-            self._rh_status.hincrby(key, module, 1)
-            self._rh_status.hset(key, module + str('_ts'), ts)
-        if (args):
-            self._rh_status.hset(key, module + str('_url'), str(args))
+        key = 'flags_'+str(consec_index)
+        self._rh_status.hset(consec_key, key, state)
+        ts_key = 'ts_' + str(consec_index)
+        tStamp = datetime.utcnow()
+        self._rh_status.hset(consec_key, ts_key, str(tStamp))
+        logger.info("Setting consecErrorDict to %s " % self._rh_status.hgetall(consec_key).items())
+
 
     def set_gw_monitor_keepalive(self):
         if (self._rh_keepalives):
@@ -151,12 +153,14 @@ class gwOperations():
             try:
                 subprocess.check_output(
                     vpn_command, shell=True, stderr=subprocess.STDOUT)
-                self._db_handle.set_gw_status(
+                self._db_handle.set_consec_error_status(
                     'charon', True, self._consec_threshold)
                 logger.info(" %s to mgw: %s", str(oper), vpn_command)
                 break
             except Exception as ex:
-                self._db_handle.set_gw_status(
+                if (oper != 'connect'):
+                    return
+                self._db_handle.set_consec_error_status(
                     'charon', False, self._consec_threshold)
                 logger.critical("Exception occured when " +
                                 str(oper) + "ting, " + str(ex))
@@ -171,11 +175,11 @@ class gwOperations():
                     dig_cmd, shell=True, stderr=subprocess.STDOUT)
                 if (dig_out.find("172.20.*")):
                     logger.info(" dig successful: " + str(dig_out))
-                    self._db_handle.set_gw_status(
+                    self._db_handle.set_consec_error_status(
                         'named', True, self._consec_threshold)
                     break
             except Exception as exc:
-                self._db_handle.set_gw_status(
+                self._db_handle.set_consec_error_status(
                     'named', False, self._consec_threshold)
                 logger.error("Exception taken for unable to verify synthetic ip for box.com, out = " +
                              str('dig_out') + " : Exception" + str(exc))
@@ -190,11 +194,11 @@ class gwOperations():
                     continue
                 else:
                     logger.info(" named successful: " + str(box_com))
-                    self._db_handle.set_gw_status(
+                    self._db_handle.set_consec_error_status(
                         'named', True, self._consec_threshold)
                     break
             except Exception as exc:
-                self._db_handle.set_gw_status(
+                self._db_handle.set_consec_error_status(
                     'named', False, self._consec_threshold)
                 logger.error("Exception taken for unable to verify synthetic ip for box.com, out = " +
                              str('box_com') + " : Exception" + str(exc))
@@ -207,7 +211,7 @@ class curlOperations():
         self._maxtime = maxtime
 
     def check_gw(self, url):
-        logger.info(" Requesting url = %s", url)
+        #logger.info(" Requesting url = %s", url)
         headers = {'user-agent': 'gw-monitor/0.0.1'}
         proxies = {'https': self._proxy}
         r = requests.head(str(url), proxies=proxies,headers=headers, verify=False, timeout=(self._timeout, self._maxtime))
@@ -219,13 +223,12 @@ class curlOperations():
             else:
                 return(True)
         else:
-            logger.error("Request for url %s returned code %d time taken %d",
+            logger.error("Request for url %s returned code %d time taken %d seconds",
                          r.url, r.status_code , r.elapsed.total_seconds())
             return False
 
 
 def start_monitoring(gw_to_monitor):
-
     try:
         db = monitorDb(gw_to_monitor)
     except Exception as exc:
@@ -234,7 +237,7 @@ def start_monitoring(gw_to_monitor):
     _proxy = db.get_monitor_var('proxy')
     _curl_connect_timeout = float(db.get_monitor_var('curl_connect_timeout'))
     _curl_max_time = float(db.get_monitor_var('curl_max_time'))
-    _consec_failure_total_cnt = db.get_monitor_var('consec_fail_threshold')
+    _consec_fail_cnt = db.get_monitor_var('consec_fail_threshold')
     _url_whitelist = db.get_monitor_var('url_white_list')
     _url_whitelist = _url_whitelist.replace("[", "")
     _url_whitelist = _url_whitelist.replace("]", "")
@@ -245,13 +248,14 @@ def start_monitoring(gw_to_monitor):
 
     logger.info("Final configs: CURL_CONNECT_TIMEOUT: %s, "
                 "CURL_MAX_TIME: %s, PROXY: %s, "
-                "CONSEC_FAILURE_TOTAL_CNT: %s, "
+                "consec_fail_cnt: %s, "
                 "URL_WHITE_LIST: %s, DUTY_CYCLE_TIME: %s",
                 str(_curl_connect_timeout), str(_curl_max_time),
-                str(_proxy), str(_consec_failure_total_cnt),
+                str(_proxy), str(_consec_fail_cnt),
                 str(_url_whitelist), str(_duty_cycle_time))
 
-    gwOps = gwOperations(db, _consec_failure_total_cnt)
+    db.init_status_flags_ts(_consec_fail_cnt)
+    gwOps = gwOperations(db, _consec_fail_cnt)
     curlOps = curlOperations(_proxy, _curl_connect_timeout, _curl_max_time)
 
     start = time.time()
@@ -268,19 +272,22 @@ def start_monitoring(gw_to_monitor):
         logger.info("Named Connection + Gateway Connection = " +
                     str((1000 * (time.time() - start))) + " Milliseconds")
         curl_start = time.time()
-        rcodes = []
+        rcodes = [True]*len(_url_whitelist)
+        ii = 0
         for url in _url_whitelist:
-            rcode = curlOps.check_gw(str(url))
-            logger.info("Curl Operation for url %s returned rcode %d",str(url), rcode)
-            rcodes.append(rcode)
+            rcodes[ii] = curlOps.check_gw(str(url))
+            ii += 1
         curl_end = time.time()
-        status =  reduce(lambda x, y: x | y, rcodes)
-        db.set_gw_status('elastica', status, _consec_failure_total_cnt)
-        logger.info("Status = %s It took %s Milliseconds for curl to complete, curl-rcodes = %s" , str(status),  str(1000 * (curl_end - curl_start)), str(rcodes))
-
+        if rcodes.count(True) > rcodes.count(False):
+            status = True
+        else:
+            status = False
+        db.set_consec_error_status('elastica', status, _consec_fail_cnt)
+        logger.info("Status = %s It took %s Milliseconds for curl to complete, curl-rcodes = %s" ,
+                    str(status),  str(1000 * (curl_end - curl_start)), str(rcodes))
         time.sleep(10)
         time_left = (60 * float(_duty_cycle_time)) - (time.time() - start)
-        if (time_left < 0):
+        if (time_left < 10):
             logger.info("Disconnecting from Gateway and Reconnecting")
             gwOps.check_charon('disconnect')
             time.sleep(5)
@@ -290,8 +297,7 @@ def start_monitoring(gw_to_monitor):
             gwOps.check_charon('connect')
             logger.info("Gateway Connection = " + str((1000 * (time.time() - start))) + " Milliseconds")
         else:
-            logger.info("Back to Curl time_left = %s", str(time_left))
-            continue
+            logger.info("Back to Curl duty_cycle_time_left = %d seconds", time_left)
 
 
 if __name__ == "__main__":

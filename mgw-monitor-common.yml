@@ -1,0 +1,45 @@
+version: "3"
+services:
+    mgw-monitor-syslog:
+        image: helder/rsyslog
+        volumes:
+            - /var/log/elastica/mgw-monitor-syslog:/var
+    mgw-monitor-redis:
+        image: redis
+        command: redis-server --appendonly yes
+        volumes:
+            - /var/log/elastica/mgw-monitor-redis:/var
+            - /home/madmin/mgw-monitor/redis-data:/data
+        links: 
+            - mgw-monitor-syslog
+    mgw-monitor-websvr:
+        #http://730926784978.dkr.ecr.us-west-2.amazonaws.com/dev/el-mgw-monitor:2.83.0rc
+        ##Unable to setup access to registry yet. Until which use local images.
+        build: ./mgw-monitor-websvr
+        image: mgw-monitor-web:latest
+        command: python app.py
+        ports:
+        - "443:443"
+        environment: 
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379
+            - AUTH_USER=matrix
+            - AUTH_SECRET=u+6BFXz8fL*Zr;7g
+        volumes:
+            - /etc/ssl:/etc/ssl
+            - /var/log/elastica/mgw-monitor-websvr-1:/var/log
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+    mgw-monitor-cfg:
+        build: mgw-monitor-cfg
+        image: mgw-monitor-cfg:latest
+        command: /root/docker-entry-point.sh
+        volumes:
+            - /var/log/elastica/mgw-monitor-cfg:/var
+        links: 
+            - mgw-monitor-syslog
+            - mgw-monitor-redis
+        environment:
+            - DB_PORT_6379_TCP_ADDR=mgw-monitor-redis
+            - DB_PORT_6379_TCP_PORT=6379

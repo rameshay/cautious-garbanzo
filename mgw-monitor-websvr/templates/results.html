@@ -1,0 +1,11 @@
+<!doctype html>
+<title>{{ title  }}</title>
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
+<div class=page>
+  <h1>Gateway Status </h1>
+  {% for key, value in codes.iteritems() %}
+  {% for key in codes %}
+    <h2>{{codes[loop.index]}}</h2>
+    {{ table|safe }}
+  {% endfor %}
+</div>

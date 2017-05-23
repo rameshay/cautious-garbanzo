@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+   <head>
+       <title>{{ title  }}</title>
+   </head>
+   <body>
+   
+      <table border = 1>
+         {% for key, value in codes.iteritems() %}
+         
+            <tr>
+               <th> {{ key }} </th>
+               <td> {{ value }} </td>
+            </tr>
+            
+         {% endfor %}
+      </table>
+      
+   </body>
+</html>
