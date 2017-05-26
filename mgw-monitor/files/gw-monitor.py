@@ -214,17 +214,21 @@ class curlOperations():
         #logger.info(" Requesting url = %s", url)
         headers = {'user-agent': 'gw-monitor/0.0.1'}
         proxies = {'https': self._proxy}
-        r = requests.head(str(url), proxies=proxies,headers=headers, verify=False, timeout=(self._timeout, self._maxtime))
-        if ((r.status_code == requests.codes.ok) or
-            (r.status_code == requests.codes.found)):
-            if(r.headers['Via'].find('Elastica Gateway Service') < 0):
-                logger.critical("missing via header response = %s", r.headers)
-                return(False)
+        try:
+            r = requests.head(str(url), proxies=proxies,headers=headers, verify=False, timeout=(self._timeout, self._maxtime))
+            if ((r.status_code == requests.codes.ok) or
+                (r.status_code == requests.codes.found)):
+                if(r.headers['Via'].find('Elastica Gateway Service') < 0):
+                    logger.critical("missing via header response = %s", r.headers)
+                    return(False)
+                else:
+                    return(True)
             else:
-                return(True)
-        else:
-            logger.error("Request for url %s returned code %d time taken %d seconds",
-                         r.url, r.status_code , r.elapsed.total_seconds())
+                logger.error("Request for url %s returned code %d time taken %d seconds",
+                             r.url, r.status_code , r.elapsed.total_seconds())
+                return False
+        except Exception as ex:
+            logger.error("Request for url %s raised exception %s", r.url,str(ex))
             return False
 
 
